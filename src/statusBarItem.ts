@@ -1,10 +1,7 @@
 import * as vscode from 'vscode'
+import { countTokens } from './tokenizer'
 
 const OUTPUT_CHANNEL_NAME = 'Claude Prompt — Token Breakdown'
-
-export function estimateTokens(text: string): number {
-  return Math.round(text.length / 4)
-}
 
 export class TokenStatusBar implements vscode.Disposable {
   private item: vscode.StatusBarItem
@@ -45,7 +42,7 @@ export class TokenStatusBar implements vscode.Disposable {
   }
 
   private update(document: vscode.TextDocument): void {
-    const tokens = estimateTokens(document.getText())
+    const tokens = countTokens(document.getText())
     this.item.text = `⚡ ~${tokens} tokens`
     this.item.tooltip = 'Click to see token breakdown by section'
   }
@@ -63,7 +60,7 @@ export class TokenStatusBar implements vscode.Disposable {
 
     let total = 0
     for (const { heading, content } of sections) {
-      const tokens = estimateTokens(content)
+      const tokens = countTokens(content)
       total += tokens
       this.outputChannel.appendLine(`${heading.padEnd(40)} ~${tokens} tokens`)
     }

@@ -81,7 +81,12 @@ export const workspace = {
   onDidChangeTextDocument: () => ({ dispose: () => {} }),
   onDidOpenTextDocument: () => ({ dispose: () => {} }),
   onDidCloseTextDocument: () => ({ dispose: () => {} }),
+  onDidChangeConfiguration: () => ({ dispose: () => {} }),
   textDocuments: [] as unknown[],
+  getWorkspaceFolder: () => undefined,
+  getConfiguration: (_section?: string) => ({
+    get: <T>(_key: string, defaultValue?: T) => defaultValue,
+  }),
 }
 
 export const window = {
@@ -109,3 +114,32 @@ export const commands = {
 }
 
 export const StatusBarAlignment = { Left: 1, Right: 2 }
+
+export class TreeItem {
+  description?: string
+  tooltip?: string
+  command?: unknown
+  iconPath?: unknown
+  contextValue?: string
+  constructor(public label: string, public collapsibleState?: number) {}
+}
+
+export const TreeItemCollapsibleState = { None: 0, Collapsed: 1, Expanded: 2 }
+
+export class ThemeIcon {
+  constructor(public id: string) {}
+}
+
+export const ViewColumn = { Active: -1, Beside: -2, One: 1, Two: 2 }
+export const ConfigurationTarget = { Global: 1, Workspace: 2, WorkspaceFolder: 3 }
+export const TextEditorRevealType = { InCenter: 2 }
+
+export class Position {
+  constructor(public line: number, public character: number) {}
+}
+
+export class Selection extends Range {}
+
+export const env = {
+  clipboard: { writeText: async (_t: string) => {} },
+}

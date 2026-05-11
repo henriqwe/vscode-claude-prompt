@@ -1,26 +1,208 @@
 {
   "name": "vscode-claude-prompt",
+  "publisher": "henriqwe",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/henriqwe/vscode-claude-prompt"
+  },
+  "license": "MIT",
   "displayName": "Claude Prompt",
   "description": "Autocomplete, hover docs, linting, and token count for .prompt.md files",
   "version": "0.1.0",
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.117.0"
   },
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onLanguage:claude-prompt"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "languages": [
       {
         "id": "claude-prompt",
-        "extensions": [
-          ".prompt.md"
+        "filenamePatterns": [
+          "*.prompt.md"
         ],
         "aliases": [
           "Claude Prompt"
         ]
+      }
+    ],
+    "commands": [
+      {
+        "command": "claude-prompt.run",
+        "title": "Run in Claude",
+        "icon": "$(play)",
+        "category": "Claude Prompt"
+      },
+      {
+        "command": "claude-prompt.runWithOptions",
+        "title": "Run in Claude (with options...)",
+        "icon": "$(settings-gear)",
+        "category": "Claude Prompt"
+      },
+      {
+        "command": "claude-prompt.openPrompt",
+        "title": "Open Prompt...",
+        "category": "Claude Prompt"
+      },
+      {
+        "command": "claude-prompt.newFromTemplate",
+        "title": "New Prompt from Template...",
+        "icon": "$(new-file)",
+        "category": "Claude Prompt"
+      },
+      {
+        "command": "claude-prompt.openPreview",
+        "title": "Open Preview",
+        "icon": "$(open-preview)",
+        "category": "Claude Prompt"
+      },
+      {
+        "command": "claude-prompt.toggleDecorations",
+        "title": "Toggle Token Decorations",
+        "category": "Claude Prompt"
+      },
+      {
+        "command": "claude-prompt.insertSkill",
+        "title": "Insert Skill",
+        "category": "Claude Prompt"
+      },
+      {
+        "command": "claude-prompt.openSkillReadme",
+        "title": "Open Skill README",
+        "icon": "$(book)",
+        "category": "Claude Prompt"
+      },
+      {
+        "command": "claude-prompt.openRun",
+        "title": "Open Run",
+        "category": "Claude Prompt"
+      },
+      {
+        "command": "claude-prompt.deleteRun",
+        "title": "Delete Run",
+        "icon": "$(trash)",
+        "category": "Claude Prompt"
+      },
+      {
+        "command": "claude-prompt.clearRunHistory",
+        "title": "Clear Run History",
+        "icon": "$(clear-all)",
+        "category": "Claude Prompt"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "claudePrompt",
+          "title": "Claude Prompt",
+          "icon": "$(comment-discussion)"
+        }
+      ]
+    },
+    "views": {
+      "claudePrompt": [
+        {
+          "id": "claudePromptSkills",
+          "name": "Skills"
+        },
+        {
+          "id": "claudePromptRuns",
+          "name": "Run History"
+        }
+      ]
+    },
+    "menus": {
+      "editor/title": [
+        {
+          "command": "claude-prompt.run",
+          "when": "resourceLangId == claude-prompt",
+          "group": "navigation"
+        },
+        {
+          "command": "claude-prompt.runWithOptions",
+          "when": "resourceLangId == claude-prompt",
+          "group": "navigation"
+        },
+        {
+          "command": "claude-prompt.openPreview",
+          "when": "resourceLangId == claude-prompt",
+          "group": "navigation"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "claude-prompt.newFromTemplate",
+          "when": "view == claudePromptSkills",
+          "group": "navigation"
+        },
+        {
+          "command": "claude-prompt.clearRunHistory",
+          "when": "view == claudePromptRuns",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "claude-prompt.openSkillReadme",
+          "when": "view == claudePromptSkills && viewItem == skill",
+          "group": "inline"
+        },
+        {
+          "command": "claude-prompt.deleteRun",
+          "when": "view == claudePromptRuns && viewItem == run",
+          "group": "inline"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Claude Prompt",
+      "properties": {
+        "claude-prompt.lint.unresolved-file-ref": {
+          "type": "boolean",
+          "default": true,
+          "description": "Flag @path references that don't exist on disk."
+        },
+        "claude-prompt.lint.outside-workspace": {
+          "type": "boolean",
+          "default": true,
+          "description": "Flag @path references that resolve outside the workspace root."
+        },
+        "claude-prompt.lint.duplicate-skill": {
+          "type": "boolean",
+          "default": true,
+          "description": "Flag the same /skill invoked more than once."
+        },
+        "claude-prompt.lint.missing-tabstops": {
+          "type": "boolean",
+          "default": true,
+          "description": "Flag skill snippet placeholders left unfilled."
+        },
+        "claude-prompt.runMode": {
+          "type": "string",
+          "enum": [
+            "panel",
+            "terminal"
+          ],
+          "default": "panel",
+          "description": "Where Claude output streams: 'panel' (webview) or 'terminal'."
+        },
+        "claude-prompt.decorations.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Highlight expanded sections by token weight."
+        }
+      }
+    },
+    "keybindings": [
+      {
+        "command": "claude-prompt.openPrompt",
+        "key": "ctrl+alt+p",
+        "mac": "cmd+alt+p"
       }
     ]
   },
@@ -33,9 +215,12 @@
   },
   "devDependencies": {
     "@types/node": "^20.19.40",
-    "@types/vscode": "^1.118.0",
+    "@types/vscode": "^1.117.0",
     "@vscode/vsce": "^2.22.0",
     "typescript": "^5.9.3",
     "vitest": "^1.6.1"
+  },
+  "dependencies": {
+    "gpt-tokenizer": "^3.4.0"
   }
 }
