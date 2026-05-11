@@ -1,0 +1,41 @@
+{
+  "name": "vscode-claude-prompt",
+  "displayName": "Claude Prompt",
+  "description": "Autocomplete, hover docs, linting, and token count for .prompt.md files",
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "claude-prompt",
+        "extensions": [
+          ".prompt.md"
+        ],
+        "aliases": [
+          "Claude Prompt"
+        ]
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.40",
+    "@types/vscode": "^1.118.0",
+    "@vscode/vsce": "^2.22.0",
+    "typescript": "^5.9.3",
+    "vitest": "^1.6.1"
+  }
+}
