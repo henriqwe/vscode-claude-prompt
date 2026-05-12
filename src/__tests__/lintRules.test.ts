@@ -157,6 +157,11 @@ describe('findFileRefs', () => {
   it('returns empty when no refs', () => {
     expect(findFileRefs(makeDoc('plain text'))).toHaveLength(0)
   })
+
+  it('captures leading-slash refs (workspace-root style)', () => {
+    const doc = makeDoc('can u read this file? @/src/App.tsx')
+    expect(findFileRefs(doc).map(r => r.ref)).toEqual(['/src/App.tsx'])
+  })
 })
 
 describe('findSkillInvocations', () => {

@@ -201,7 +201,8 @@ function expandRecursive(text: string, ctx: RecursiveCtx): string {
   // 3) @file references — inline files as fenced blocks
   // Match @path/to/file outside of code fences.
   result = replaceOutsideFences(result, /(^|[\s(\[])@([./\w-]+\.[A-Za-z0-9]+)\b/g, (match, prefix, refPath, lineIdx, colIdx) => {
-    const absPath = path.resolve(ctx.workspaceRoot, refPath)
+    const relPath = refPath.replace(/^\/+/, '')
+    const absPath = path.resolve(ctx.workspaceRoot, relPath)
     const range = lineRange(ctx.lineOffset + lineIdx, refPath.length, colIdx + prefix.length)
     const content = ctx.read(absPath)
     if (content == null) {

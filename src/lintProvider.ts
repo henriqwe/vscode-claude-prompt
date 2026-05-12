@@ -46,7 +46,9 @@ export class LintProvider implements vscode.Disposable {
     const text = document.getText()
     const diagnostics: vscode.Diagnostic[] = []
 
-    diagnostics.push(...checkNoContext(document, text))
+    if (isLintEnabled('no-context')) {
+      diagnostics.push(...checkNoContext(document, text))
+    }
     diagnostics.push(...checkVagueScope(document, text))
     diagnostics.push(...checkMultiSkill(document, text))
     diagnostics.push(...checkUnknownSkill(document, text, this.registry))
@@ -91,8 +93,11 @@ function checkNoContext(doc: vscode.TextDocument, text: string): vscode.Diagnost
   const hasFilePath = /[^\s]+\.[a-z]{1,5}(\/|$)/i.test(text)
   const hasAtReference = /@[^\s]/.test(text)
   const hasCodeBlock = /```/.test(text)
+  // Only warn when the prompt actually looks like a code task — otherwise
+  // creative prompts ("generate a top 10 about tcg") trigger false positives.
+  const codeIntent = /\b(fix|bug|refactor|debug|implement|function|class|method|variable|import|module|api|endpoint|route|component|test|typescript|javascript|python|rust|golang|sql|query|schema|migration|error|exception|stack ?trace|compile|build|lint|patch|diff)\b/i.test(text)
 
-  if (wordCount < 20 && !hasFilePath && !hasAtReference && !hasCodeBlock) {
+  if (codeIntent && wordCount < 20 && !hasFilePath && !hasAtReference && !hasCodeBlock) {
     const diag = new vscode.Diagnostic(
       makeRange(doc, 0),
       'No context provided — include a file path, function name, or code block.',
@@ -217,10 +222,15 @@ export function findFileRefs(doc: vscode.TextDocument): Array<{ ref: string; ran
   return refs
 }
 
+function resolveRef(workspaceRoot: string, ref: string): string {
+  const normalized = ref.startsWith('/') ? ref.slice(1) : ref
+  return path.resolve(workspaceRoot, normalized)
+}
+
 function checkUnresolvedFileRef(doc: vscode.TextDocument, workspaceRoot: string): vscode.Diagnostic[] {
   const out: vscode.Diagnostic[] = []
   for (const { ref, range } of findFileRefs(doc)) {
-    const abs = path.resolve(workspaceRoot, ref)
+    const abs = resolveRef(workspaceRoot, ref)
     if (!fs.existsSync(abs)) {
       const diag = new vscode.Diagnostic(
         range,
@@ -239,7 +249,7 @@ function checkOutsideWorkspace(doc: vscode.TextDocument, workspaceRoot: string):
   const out: vscode.Diagnostic[] = []
   const rootResolved = path.resolve(workspaceRoot) + path.sep
   for (const { ref, range } of findFileRefs(doc)) {
-    const abs = path.resolve(workspaceRoot, ref)
+    const abs = resolveRef(workspaceRoot, ref)
     if (!abs.startsWith(rootResolved) && abs !== path.resolve(workspaceRoot)) {
       const diag = new vscode.Diagnostic(
         range,

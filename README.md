@@ -118,6 +118,7 @@ npm run watch        # incremental watch build
 npm test             # run unit tests (Vitest)
 npm run test:watch   # watch mode
 vsce package --no-dependencies  # build .vsix
+vsce package --no-dependencies && code --install-extension vscode-claude-prompt-0.1.0.vsix
 ```
 
 ---

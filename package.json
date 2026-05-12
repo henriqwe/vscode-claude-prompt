@@ -162,6 +162,11 @@
     "configuration": {
       "title": "Claude Prompt",
       "properties": {
+        "claude-prompt.lint.no-context": {
+          "type": "boolean",
+          "default": true,
+          "description": "Warn when a short prompt that looks like a code task lacks a file reference, function name, or code block."
+        },
         "claude-prompt.lint.unresolved-file-ref": {
           "type": "boolean",
           "default": true,

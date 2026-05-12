@@ -107,7 +107,7 @@ export function buildArgs(opts: RunOptions): string[] {
 }
 
 export function buildCommand(tempPath: string, opts: RunOptions): string {
-  const parts = ['claude']
+  const parts = ['claude', '-p']
   if (opts.model) parts.push('--model', opts.model)
   if (opts.thinking) parts.push('--thinking')
   if (opts.extraFlags && opts.extraFlags.trim()) parts.push(opts.extraFlags.trim())
