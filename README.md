@@ -42,10 +42,23 @@ Diagnostics appear in the editor and the **Problems** panel (`Ctrl+Shift+M`):
 
 At the top of every `.prompt.md` file two CodeLens items appear:
 
-- **▶ Run in Claude** — opens the VS Code integrated terminal and runs `claude < your-file.prompt.md`, sending the full prompt to the Claude CLI
+- **▶ Run in Claude** — opens a dedicated webview panel and streams the Claude CLI response in real time
 - **⚡ ~N tokens** — estimated token count; click to open an Output panel breakdown by section
 
 A **▶ play icon** also appears in the editor title bar for quick access.
+
+### Multi-Turn Conversation Panel
+
+The run panel is a full conversation interface, not just a one-shot output viewer:
+
+- Streams text, thinking blocks, and tool-use events as they arrive
+- Shows a **Send follow-up** input at the bottom to continue the conversation in the same Claude session (`--resume`)
+- Displays per-turn cost and token usage
+- Supports **replay** — reopen any past run from the Run History tree without re-running Claude
+
+### Run History
+
+Every run is automatically saved to a persistent sidebar tree (**Claude Runs**), bucketed into Today / Yesterday / This week / Older. Click any entry to replay it in the conversation panel. The tree also shows the model, duration, and exit status for each run.
 
 ---
 
@@ -101,12 +114,14 @@ Migrate to httpOnly cookies following the pattern in @src/services/api.ts.
 
 ## Skill Discovery
 
-The extension reads skills from two sources and merges them:
+The extension reads skills from four sources and merges them (project takes precedence over global on name collisions):
 
-1. **`.claude/skills/` directories** — each subfolder becomes a skill; its name is the folder name and its description is read from `README.md`
-2. **`.claude/settings.json`** — any names listed in a top-level `skills` array are added
+1. **`.claude/skills/<name>/`** — project-local skills; description read from `README.md`
+2. **`.claude/settings.json`** — project-local skill names listed in the top-level `skills` array
+3. **`~/.claude/skills/<name>/`** — global skills shared across all workspaces
+4. **`~/.claude/settings.json`** — global skill names listed in the top-level `skills` array
 
-Skills hot-reload automatically when these files change — no restart needed.
+Skills hot-reload automatically when any of these files change — no restart needed. The **Skills** sidebar tree groups them under **Project** and **Global** headings.
 
 ---
 

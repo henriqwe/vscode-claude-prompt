@@ -2,6 +2,10 @@ import * as vscode from 'vscode'
 import * as fs from 'fs'
 import * as path from 'path'
 
+/**
+ * Shows a QuickPick of `*.prompt.md` files from the extension's `templates/` directory
+ * and copies the chosen template into the workspace root with a user-supplied name.
+ */
 export async function newFromTemplateCommand(extensionPath: string): Promise<void> {
   const templatesDir = path.join(extensionPath, 'templates')
   if (!fs.existsSync(templatesDir)) {

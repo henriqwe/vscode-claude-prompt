@@ -4,6 +4,16 @@ import { SkillRegistry } from './skillRegistry'
 
 const DEBOUNCE_MS = 300
 
+/**
+ * Applies whole-line background colours to every expanded section in a `.prompt.md` file:
+ *   - green  (<500 tokens)
+ *   - yellow (500–1999 tokens)
+ *   - red    (≥2000 tokens)
+ * Decorations are debounced (300 ms) and recomputed via `promptExpander.expand` so the
+ * colours reflect the actual inlined content, not just the raw source lines.
+ * Can be toggled via `claude-prompt.toggleDecorations` or the workspace setting
+ * `claude-prompt.decorations.enabled`.
+ */
 export class TokenDecorations implements vscode.Disposable {
   private enabled = true
   private disposables: vscode.Disposable[] = []

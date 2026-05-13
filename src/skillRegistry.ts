@@ -1,6 +1,7 @@
 import * as vscode from 'vscode'
 import * as path from 'path'
 import * as fs from 'fs'
+import * as os from 'os'
 
 export interface Skill {
   name: string
@@ -8,16 +9,29 @@ export interface Skill {
   triggerConditions: string
   sourcePath: string
   readmePath: string | null
+  source: 'project' | 'global'
 }
 
+/**
+ * Central registry of all known skills, merged from four sources in priority order:
+ *   1. project `.claude/skills/<name>/`
+ *   2. project `.claude/settings.json` `skills` array
+ *   3. global `~/.claude/skills/<name>/`
+ *   4. global `~/.claude/settings.json` `skills` array
+ *
+ * Project skills win over global on name collisions (first-writer wins in `refresh`).
+ * FileSystemWatchers on all four sources trigger `refresh()` automatically.
+ */
 export class SkillRegistry implements vscode.Disposable {
   private skills = new Map<string, Skill>()
   private watchers: vscode.FileSystemWatcher[] = []
+  private readonly globalClaudeDir: string
 
   private _onDidChange = new vscode.EventEmitter<void>()
   readonly onDidChange = this._onDidChange.event
 
-  constructor() {
+  constructor(globalClaudeDir?: string) {
+    this.globalClaudeDir = globalClaudeDir ?? path.join(os.homedir(), '.claude')
     this.setupWatchers()
     this.refresh()
   }
@@ -34,10 +48,13 @@ export class SkillRegistry implements vscode.Disposable {
     return this.skills.has(name)
   }
 
+  /** Clears and reloads all four skill sources; fires `onDidChange` when done. */
   refresh(): void {
     this.skills.clear()
     this.loadFromSkillDirs()
     this.loadFromSettings()
+    this.loadFromGlobalSkillDirs()
+    this.loadFromGlobalSettings()
     this._onDidChange.fire()
   }
 
@@ -52,7 +69,22 @@ export class SkillRegistry implements vscode.Disposable {
     settingsWatcher.onDidDelete(() => this.refresh())
     settingsWatcher.onDidChange(() => this.refresh())
 
-    this.watchers.push(skillsWatcher, settingsWatcher)
+    const globalSkillsUri = vscode.Uri.file(this.globalClaudeDir)
+    const globalSkillsWatcher = vscode.workspace.createFileSystemWatcher(
+      new vscode.RelativePattern(globalSkillsUri, 'skills/**'),
+    )
+    globalSkillsWatcher.onDidCreate(() => this.refresh())
+    globalSkillsWatcher.onDidDelete(() => this.refresh())
+    globalSkillsWatcher.onDidChange(() => this.refresh())
+
+    const globalSettingsWatcher = vscode.workspace.createFileSystemWatcher(
+      new vscode.RelativePattern(globalSkillsUri, 'settings.json'),
+    )
+    globalSettingsWatcher.onDidCreate(() => this.refresh())
+    globalSettingsWatcher.onDidDelete(() => this.refresh())
+    globalSettingsWatcher.onDidChange(() => this.refresh())
+
+    this.watchers.push(skillsWatcher, settingsWatcher, globalSkillsWatcher, globalSettingsWatcher)
   }
 
   private loadFromSkillDirs(): void {
@@ -65,7 +97,7 @@ export class SkillRegistry implements vscode.Disposable {
       for (const entry of entries) {
         if (!entry.isDirectory()) continue
         const skillDir = path.join(skillsRoot, entry.name)
-        const skill = this.parseSkillDir(entry.name, skillDir)
+        const skill = this.parseSkillDir(entry.name, skillDir, 'project')
         if (!this.skills.has(skill.name)) {
           this.skills.set(skill.name, skill)
         }
@@ -73,7 +105,27 @@ export class SkillRegistry implements vscode.Disposable {
     }
   }
 
-  private parseSkillDir(name: string, dirPath: string): Skill {
+  private loadFromGlobalSkillDirs(): void {
+    const skillsRoot = path.join(this.globalClaudeDir, 'skills')
+    if (!fs.existsSync(skillsRoot)) return
+
+    let entries: fs.Dirent[]
+    try {
+      entries = fs.readdirSync(skillsRoot, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue
+      const skillDir = path.join(skillsRoot, entry.name)
+      const skill = this.parseSkillDir(entry.name, skillDir, 'global')
+      if (!this.skills.has(skill.name)) {
+        this.skills.set(skill.name, skill)
+      }
+    }
+  }
+
+  private parseSkillDir(name: string, dirPath: string, source: Skill['source']): Skill {
     const readmePath = this.findReadme(dirPath)
     let description = ''
     let triggerConditions = ''
@@ -84,11 +136,11 @@ export class SkillRegistry implements vscode.Disposable {
       triggerConditions = extractTriggerConditions(content)
     }
 
-    return { name, description, triggerConditions, sourcePath: dirPath, readmePath }
+    return { name, description, triggerConditions, sourcePath: dirPath, readmePath, source }
   }
 
   private findReadme(dirPath: string): string | null {
-    const candidates = ['README.md', 'readme.md']
+    const candidates = ['README.md', 'readme.md', 'SKILL.md', 'skill.md']
     for (const candidate of candidates) {
       const full = path.join(dirPath, candidate)
       if (fs.existsSync(full)) return full
@@ -121,6 +173,7 @@ export class SkillRegistry implements vscode.Disposable {
               triggerConditions: '',
               sourcePath: settingsPath,
               readmePath: null,
+              source: 'project',
             })
           }
         }
@@ -130,14 +183,67 @@ export class SkillRegistry implements vscode.Disposable {
     }
   }
 
+  private loadFromGlobalSettings(): void {
+    const settingsPath = path.join(this.globalClaudeDir, 'settings.json')
+    if (!fs.existsSync(settingsPath)) return
+
+    try {
+      const raw = fs.readFileSync(settingsPath, 'utf8')
+      const json = JSON.parse(raw)
+      const skills: unknown[] = json?.skills ?? []
+      for (const entry of skills) {
+        if (typeof entry === 'string' && !this.skills.has(entry)) {
+          this.skills.set(entry, {
+            name: entry,
+            description: '',
+            triggerConditions: '',
+            sourcePath: settingsPath,
+            readmePath: null,
+            source: 'global',
+          })
+        }
+      }
+    } catch {
+      // malformed JSON — skip
+    }
+  }
+
   dispose(): void {
     this.watchers.forEach(w => w.dispose())
     this._onDidChange.dispose()
   }
 }
 
+function parseFrontmatter(content: string): { body: string; fields: Record<string, string> } {
+  const fields: Record<string, string> = {}
+  if (!content.startsWith('---')) return { body: content, fields }
+
+  const closeIdx = content.indexOf('\n---', 3)
+  if (closeIdx === -1) return { body: content, fields }
+
+  const frontmatter = content.slice(3, closeIdx)
+  const body = content.slice(closeIdx + 4).trimStart()
+
+  for (const line of frontmatter.split('\n')) {
+    const m = line.match(/^(\w+):\s*(.+?)\s*$/)
+    if (!m) continue
+    const val = m[2].replace(/^["']|["']$/g, '')
+    fields[m[1]] = val
+  }
+
+  return { body, fields }
+}
+
+/**
+ * Returns the skill description from the README.
+ * Checks the frontmatter `description` field first; falls back to the first
+ * non-heading, non-empty line in the body.
+ */
 export function extractDescription(content: string): string {
-  const lines = content.split('\n')
+  const { body, fields } = parseFrontmatter(content)
+  if (fields.description) return fields.description
+
+  const lines = body.split('\n')
   for (const line of lines) {
     const trimmed = line.trim()
     if (trimmed && !trimmed.startsWith('#')) return trimmed
@@ -145,23 +251,31 @@ export function extractDescription(content: string): string {
   return ''
 }
 
+/**
+ * Returns the first bullet under a heading matching `when to use|triggers when|use this skill when`.
+ * Falls back to an inline `TRIGGERS WHEN: …` or `Use this skill when: …` phrase if no heading matches.
+ */
 export function extractTriggerConditions(content: string): string {
+  const { body } = parseFrontmatter(content)
   const triggerHeadings = /^#{1,3}\s+(when to use|triggers when|use this skill when)/i
-  const lines = content.split('\n')
+  const lines = body.split('\n')
   for (let i = 0; i < lines.length; i++) {
     if (triggerHeadings.test(lines[i])) {
-      // return first non-empty line after the heading
       for (let j = i + 1; j < lines.length; j++) {
         const trimmed = lines[j].trim().replace(/^[-*]\s*/, '')
         if (trimmed && !trimmed.startsWith('#')) return trimmed
       }
     }
   }
-  // also check inline "TRIGGERS WHEN" or "Use this skill when" in body
-  const inlineMatch = content.match(/(?:TRIGGER[S]? WHEN|Use this skill when)[:\s]+([^\n.]+)/i)
+  const inlineMatch = body.match(/(?:TRIGGER[S]? WHEN|Use this skill when)[:\s]+([^\n.]+)/i)
   return inlineMatch ? inlineMatch[1].trim() : ''
 }
 
+/**
+ * Builds a VS Code snippet string from the skill's ARGUMENTS bullet list.
+ * Each bullet becomes a tab stop: `label: ${N:label}`.
+ * Returns null when no bullets are found (no snippet expansion needed).
+ */
 export function extractSnippetTabStops(content: string): string | null {
   // Look for ARGUMENTS section first
   const argsMatch = content.match(/^#{1,3}\s+ARGUMENTS\s*\n([\s\S]*?)(?=^#{1,3}|\Z)/im)

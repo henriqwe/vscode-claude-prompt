@@ -3,6 +3,11 @@ import { countTokens } from './tokenizer'
 
 const OUTPUT_CHANNEL_NAME = 'Claude Prompt — Token Breakdown'
 
+/**
+ * Status-bar item showing `⚡ ~N tokens` for the active `.prompt.md` file.
+ * Clicking it runs `claude-prompt.showTokenBreakdown`, which prints a
+ * per-heading token table to a dedicated Output Channel.
+ */
 export class TokenStatusBar implements vscode.Disposable {
   private item: vscode.StatusBarItem
   private outputChannel: vscode.OutputChannel
@@ -81,6 +86,7 @@ function isPromptFile(doc: vscode.TextDocument): boolean {
   return doc.fileName.endsWith('.prompt.md')
 }
 
+/** Splits the document into `{heading, content}` pairs at each Markdown heading line. */
 function parseSections(text: string): Array<{ heading: string; content: string }> {
   const lines = text.split('\n')
   const sections: Array<{ heading: string; content: string }> = []

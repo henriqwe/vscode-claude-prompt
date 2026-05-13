@@ -28,6 +28,21 @@ interface ResultStats {
   outputTokens?: number
 }
 
+/**
+ * Webview panel that runs the Claude CLI and streams output as structured events.
+ *
+ * Lifecycle:
+ *   constructor → `startTurn(initialPrompt)` → Claude process → `finishTurn()`
+ *   User reply → `startTurn(followUpMessage)` → Claude process (with `--resume`) → …
+ *
+ * CLI flags used: `-p --verbose --output-format stream-json`
+ * For turns > 0, `--resume <sessionId>` continues the same Claude session.
+ * The process env sets `CI=1 TERM=dumb NO_COLOR=1` to suppress interactive prompts
+ * and ANSI codes from the Claude CLI.
+ *
+ * After every turn the run record is upserted into `RunHistory` so the sidebar
+ * reflects partial state while the conversation is still in progress.
+ */
 export class ConversationPanel implements vscode.Disposable {
   private panel: vscode.WebviewPanel
   private disposables: vscode.Disposable[] = []
@@ -105,6 +120,7 @@ export class ConversationPanel implements vscode.Disposable {
     this.child.on('close', code => this.finishTurn(code))
   }
 
+  /** Accumulates stdout into a line buffer and dispatches complete lines to `handleLine`. */
   private handleStdout(chunk: string): void {
     this.lineBuffer += chunk
     let nl: number
@@ -115,6 +131,10 @@ export class ConversationPanel implements vscode.Disposable {
     }
   }
 
+  /**
+   * Parses one `stream-json` line. Non-JSON lines (progress dots, warnings) are
+   * forwarded as plain text so they still appear in the webview.
+   */
   private handleLine(line: string): void {
     let evt: any
     try { evt = JSON.parse(line) } catch {
@@ -187,6 +207,12 @@ export class ConversationPanel implements vscode.Disposable {
     this.panel.webview.postMessage(evt)
   }
 
+  /**
+   * Called when the Claude process exits. Flushes any buffered stdout, records
+   * the turn, and upserts the full run record into history.
+   * A non-zero exit on turn > 0 is treated as "session expired" in the webview
+   * (Claude CLI sessions time out after a period of inactivity).
+   */
   private async finishTurn(exitCode: number | null): Promise<void> {
     const durationMs = Date.now() - this.turnStartedAt
     if (this.lineBuffer.trim()) {
@@ -243,6 +269,7 @@ export class ConversationPanel implements vscode.Disposable {
   }
 }
 
+/** Strips ANSI escape sequences from stderr output before forwarding to the webview. */
 function stripAnsi(s: string): string {
   return s
     .replace(/\x1b\][^\x07]*\x07/g, '')
@@ -716,9 +743,12 @@ function renderHtml(state: RenderState): string {
   </body></html>`
 }
 
+/**
+ * Returns empty string — replay output is rendered client-side by the JS
+ * `renderMarkdown` function injected in the webview script block.
+ * The raw text is passed via `fullTextBuffer` in the inline JS.
+ */
 function renderMarkdownStatic(_text: string): string {
-  // Replay output is pre-rendered client-side via the JS renderMarkdown function
-  // injected in the script block. We just need the raw text available.
   return ''
 }
 

@@ -2,6 +2,11 @@ import * as vscode from 'vscode'
 import * as fs from 'fs'
 import { SkillRegistry, extractSnippetTabStops } from './skillRegistry'
 
+/**
+ * Provides `/skill-name` completions when the user types `/` at the start of a
+ * line or after whitespace in a `.prompt.md` file.
+ * Each item shows the skill description and trigger conditions as hover docs.
+ */
 export class CompletionProvider implements vscode.CompletionItemProvider {
   constructor(private readonly registry: SkillRegistry) {}
 
@@ -34,10 +39,7 @@ export class CompletionProvider implements vscode.CompletionItemProvider {
       item.filterText = `/${skill.name}`
       item.sortText = skill.name
 
-      const snippet = buildSnippet(skill)
-      item.insertText = snippet
-        ? new vscode.SnippetString(`/${skill.name}\n${snippet}`)
-        : new vscode.SnippetString(`/${skill.name}`)
+      item.insertText = new vscode.SnippetString(`/${skill.name}`)
 
       // replace from the / character to the current position
       item.range = new vscode.Range(position.with(undefined, slashIndex), position)
@@ -47,6 +49,7 @@ export class CompletionProvider implements vscode.CompletionItemProvider {
   }
 }
 
+/** Reads the skill README and builds a tab-stop snippet string, or null if no ARGUMENTS section exists. */
 function buildSnippet(skill: { readmePath: string | null }): string | null {
   if (!skill.readmePath) return null
   try {

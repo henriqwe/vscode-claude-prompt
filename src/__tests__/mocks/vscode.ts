@@ -13,6 +13,17 @@ class VscodeEventEmitter<T> {
 
 export const EventEmitter = VscodeEventEmitter
 
+export const Uri = {
+  file: (p: string) => ({ fsPath: p, scheme: 'file', toString: () => p }),
+}
+
+export class RelativePattern {
+  constructor(
+    public base: unknown,
+    public pattern: string,
+  ) {}
+}
+
 export const DiagnosticSeverity = { Error: 0, Warning: 1, Information: 2, Hint: 3 }
 
 export class Range {
@@ -72,7 +83,7 @@ export const languages = {
 
 export const workspace = {
   workspaceFolders: [] as { uri: { fsPath: string } }[],
-  createFileSystemWatcher: (_pattern: string) => ({
+  createFileSystemWatcher: (_pattern: unknown) => ({
     onDidCreate: () => ({ dispose: () => {} }),
     onDidDelete: () => ({ dispose: () => {} }),
     onDidChange: () => ({ dispose: () => {} }),

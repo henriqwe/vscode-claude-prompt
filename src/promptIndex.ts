@@ -1,7 +1,10 @@
 import * as vscode from 'vscode'
 import * as fs from 'fs'
 
-/** Extract the first H1 heading from markdown text, falling back to null. */
+/**
+ * Extracts the first `# Heading` from markdown text, skipping YAML frontmatter
+ * and fenced code blocks. Returns null when no H1 is found.
+ */
 export function extractFirstHeading(text: string): string | null {
   const lines = text.split('\n')
   let inFence = false
@@ -21,6 +24,10 @@ export function extractFirstHeading(text: string): string | null {
   return null
 }
 
+/**
+ * Shows a QuickPick of all `*.prompt.md` files in the workspace, sorted by mtime
+ * (most-recently-modified first). The label is the H1 heading when available.
+ */
 export async function openPromptCommand(): Promise<void> {
   const files = await vscode.workspace.findFiles('**/*.prompt.md', '**/node_modules/**', 500)
   if (files.length === 0) {

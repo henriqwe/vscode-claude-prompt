@@ -11,6 +11,11 @@ function isLintEnabled(rule: string): boolean {
   return config.get<boolean>(`lint.${rule}`, true)
 }
 
+/**
+ * Runs all lint rules against every `.prompt.md` document and publishes diagnostics
+ * to a single `DiagnosticCollection`. Re-lints on text change, file open/close,
+ * registry change (new/removed skills), and `claude-prompt.lint.*` config change.
+ */
 export class LintProvider implements vscode.Disposable {
   private collection: vscode.DiagnosticCollection
   private disposables: vscode.Disposable[] = []
@@ -88,6 +93,11 @@ function makeRange(document: vscode.TextDocument, lineIndex: number): vscode.Ran
   return line.range
 }
 
+/**
+ * Warns when a short prompt has no file path, `@` reference, or code block.
+ * Only fires when the prompt contains code-task keywords to avoid false positives
+ * on creative or conversational prompts (e.g. "generate a top 10 list").
+ */
 function checkNoContext(doc: vscode.TextDocument, text: string): vscode.Diagnostic[] {
   const wordCount = text.trim().split(/\s+/).length
   const hasFilePath = /[^\s]+\.[a-z]{1,5}(\/|$)/i.test(text)
@@ -155,6 +165,11 @@ function checkMultiSkill(doc: vscode.TextDocument, _text: string): vscode.Diagno
   return diagnostics
 }
 
+/**
+ * Errors on `/skill-name` tokens not present in the registry.
+ * Only matches `/name` when preceded by start-of-line or whitespace so paths
+ * like `@src/foo` don't trigger false positives.
+ */
 function checkUnknownSkill(
   doc: vscode.TextDocument,
   _text: string,
@@ -302,9 +317,11 @@ function checkDuplicateSkill(doc: vscode.TextDocument): vscode.Diagnostic[] {
   return out
 }
 
+/**
+ * Warns on literal `${N:label}` or `$N` patterns left in the document after skill
+ * expansion — these are VS Code snippet placeholders that the user never filled in.
+ */
 function checkMissingTabstops(doc: vscode.TextDocument, text: string): vscode.Diagnostic[] {
-  // Snippet placeholders typically look like ${1:label} or $1 — if they appear
-  // literally in the saved document, the user expanded a skill but never filled it in.
   const out: vscode.Diagnostic[] = []
   const pattern = /\$\{?\d+(:[^}]*)?\}?/g
   for (let i = 0; i < doc.lineCount; i++) {

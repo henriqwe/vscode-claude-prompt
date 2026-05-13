@@ -1,6 +1,11 @@
 import * as vscode from 'vscode'
 import { countTokens } from './tokenizer'
 
+/**
+ * Emits three CodeLens actions pinned to line 0 of every `.prompt.md` file:
+ *   ▶ Run in Claude · ⚙ Run with options · ⚡ ~N tokens
+ * Refreshes the token count on every text-document change.
+ */
 export class CodeLensProvider implements vscode.CodeLensProvider {
   private _onDidChangeCodeLenses = new vscode.EventEmitter<void>()
   readonly onDidChangeCodeLenses = this._onDidChangeCodeLenses.event

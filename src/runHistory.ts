@@ -28,6 +28,12 @@ const STATE_KEY = 'claude-prompt.runs'
 const MAX = 100
 const MAX_OUTPUT = 1_000_000 // 1 MB
 
+/**
+ * Persists up to 100 `RunRecord` entries in VS Code `globalState`.
+ * Output is truncated to 1 MB per record to avoid bloating global state.
+ * `upsert` (not `add`) is used by live runs so that each completed turn updates
+ * the same record rather than appending a duplicate.
+ */
 export class RunHistory {
   private _onDidChange = new vscode.EventEmitter<void>()
   readonly onDidChange = this._onDidChange.event
@@ -83,6 +89,7 @@ export class RunHistory {
 
 type Bucket = 'Today' | 'Yesterday' | 'This week' | 'Older'
 
+/** Returns the time bucket label for `timestamp` relative to `now` (start-of-day boundaries). */
 export function bucketOf(timestamp: number, now = Date.now()): Bucket {
   const dayMs = 24 * 60 * 60 * 1000
   const startOfDay = new Date(now); startOfDay.setHours(0, 0, 0, 0)
@@ -97,6 +104,7 @@ type Node =
   | { kind: 'group'; label: Bucket; records: RunRecord[] }
   | { kind: 'run'; record: RunRecord }
 
+/** Sidebar tree that groups past runs into Today / Yesterday / This week / Older buckets. */
 export class RunHistoryTreeProvider implements vscode.TreeDataProvider<Node>, vscode.Disposable {
   private _onDidChange = new vscode.EventEmitter<Node | undefined>()
   readonly onDidChangeTreeData = this._onDidChange.event

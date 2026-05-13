@@ -20,6 +20,13 @@ export interface RunnerDeps {
   history?: RunHistory
 }
 
+/**
+ * Expands the active `.prompt.md` file and sends it to Claude.
+ * If the expanded text contains unresolved `{{variable}}` placeholders the user is
+ * prompted to fill them in, then the file is re-expanded with the supplied values.
+ * Depending on `claude-prompt.runMode`, output is sent either to a ConversationPanel
+ * webview (`'panel'`) or a VS Code integrated terminal (`'terminal'`).
+ */
 export async function runActivePrompt(
   registry: SkillRegistry,
   options: RunOptions = {},
@@ -96,6 +103,7 @@ export async function runActivePrompt(
   terminal.show()
 }
 
+/** Builds the CLI argument list for panel (non-shell) mode. */
 export function buildArgs(opts: RunOptions): string[] {
   const args: string[] = []
   if (opts.model) args.push('--model', opts.model)
@@ -106,6 +114,7 @@ export function buildArgs(opts: RunOptions): string[] {
   return args
 }
 
+/** Builds the shell command string for terminal mode (`claude -p ... < file`). */
 export function buildCommand(tempPath: string, opts: RunOptions): string {
   const parts = ['claude', '-p']
   if (opts.model) parts.push('--model', opts.model)
@@ -115,6 +124,12 @@ export function buildCommand(tempPath: string, opts: RunOptions): string {
   return parts.join(' ')
 }
 
+/**
+ * Writes `content` to a temp file named after the source file.
+ * Uses a SHA-1 of the source path as a suffix so concurrent runs of different
+ * prompt files don't clobber each other, and repeated runs of the same file
+ * reuse the same temp path (idempotent).
+ */
 function writeTempPrompt(sourceFile: string, content: string): string {
   const hash = crypto.createHash('sha1').update(sourceFile).digest('hex').slice(0, 8)
   const base = path.basename(sourceFile, '.prompt.md')
@@ -124,6 +139,7 @@ function writeTempPrompt(sourceFile: string, content: string): string {
   return tempPath
 }
 
+/** Deletes all temp files written during this extension session. Called from `deactivate()`. */
 export function cleanupTempFiles(): void {
   for (const p of TEMP_FILES) {
     try { fs.unlinkSync(p) } catch { /* ignore */ }

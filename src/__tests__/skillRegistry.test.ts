@@ -71,13 +71,16 @@ describe('extractSnippetTabStops', () => {
 
 describe('SkillRegistry (filesystem)', () => {
   let tmpDir: string
+  let globalDir: string
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-registry-test-'))
+    globalDir = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-registry-global-'))
   })
 
   afterEach(() => {
     fs.rmSync(tmpDir, { recursive: true, force: true })
+    fs.rmSync(globalDir, { recursive: true, force: true })
   })
 
   function createSkill(name: string, readme: string): void {
@@ -94,7 +97,7 @@ describe('SkillRegistry (filesystem)', () => {
     vscode.workspace.workspaceFolders = [{ uri: { fsPath: tmpDir } }]
 
     const { SkillRegistry } = await import('../skillRegistry')
-    const registry = new SkillRegistry()
+    const registry = new SkillRegistry(globalDir)
 
     const skills = registry.getAll()
     expect(skills).toHaveLength(1)
@@ -118,7 +121,7 @@ describe('SkillRegistry (filesystem)', () => {
     vscode.workspace.workspaceFolders = [{ uri: { fsPath: tmpDir } }]
 
     const { SkillRegistry } = await import('../skillRegistry')
-    const registry = new SkillRegistry()
+    const registry = new SkillRegistry(globalDir)
 
     const names = registry.getAll().map(s => s.name)
     expect(names).toContain('shared-skill')

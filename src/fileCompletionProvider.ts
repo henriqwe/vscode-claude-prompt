@@ -2,6 +2,12 @@ import * as vscode from 'vscode'
 
 const IGNORED = /^(node_modules|\.git|out|dist|\.next|coverage|\.vscode)$/
 
+/**
+ * Provides `@path/to/file` completions when the user types `@` (or `/` inside a
+ * folder path) in a `.prompt.md` file.
+ * Directories are listed before files and inserting a directory appends `/` then
+ * re-triggers completion so the user can drill down without extra keystrokes.
+ */
 export class FileCompletionProvider implements vscode.CompletionItemProvider {
   async provideCompletionItems(
     document: vscode.TextDocument,

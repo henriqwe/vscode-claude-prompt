@@ -5,6 +5,12 @@ import { countTokens } from './tokenizer'
 
 const DEBOUNCE_MS = 300
 
+/**
+ * Singleton webview panel that renders the fully-expanded prompt in real time.
+ * At most one panel exists; calling `show()` when a panel is already open
+ * updates the source URI and re-renders rather than creating a new panel.
+ * Tracks the active `.prompt.md` editor so navigating between files updates the preview.
+ */
 export class PreviewPanel implements vscode.Disposable {
   private static current: PreviewPanel | null = null
 
@@ -49,6 +55,7 @@ export class PreviewPanel implements vscode.Disposable {
     this.render()
   }
 
+  /** Debounces re-renders: replaces any pending timer on every call. */
   private schedule(): void {
     if (this.timer) clearTimeout(this.timer)
     this.timer = setTimeout(() => { this.timer = null; this.render() }, DEBOUNCE_MS)

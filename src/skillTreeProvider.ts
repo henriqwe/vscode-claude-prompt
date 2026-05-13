@@ -1,12 +1,14 @@
 import * as vscode from 'vscode'
 import { SkillRegistry, Skill } from './skillRegistry'
-import { extractSnippetTabStops } from './skillRegistry'
-import * as fs from 'fs'
 
 type Node =
   | { kind: 'group'; label: string; skills: Skill[] }
   | { kind: 'skill'; skill: Skill }
 
+/**
+ * Sidebar tree of all registered skills, grouped into **Project** and **Global** buckets.
+ * Clicking a skill node inserts `/<name>` at the cursor via `claude-prompt.insertSkill`.
+ */
 export class SkillTreeProvider implements vscode.TreeDataProvider<Node>, vscode.Disposable {
   private _onDidChange = new vscode.EventEmitter<Node | undefined>()
   readonly onDidChangeTreeData = this._onDidChange.event
@@ -41,11 +43,11 @@ export class SkillTreeProvider implements vscode.TreeDataProvider<Node>, vscode.
   getChildren(node?: Node): Node[] {
     if (!node) {
       const all = this.registry.getAll()
-      const workspace = all.filter(s => !s.sourcePath.endsWith('settings.json'))
-      const settings = all.filter(s => s.sourcePath.endsWith('settings.json'))
+      const project = all.filter(s => s.source === 'project')
+      const global = all.filter(s => s.source === 'global')
       const groups: Node[] = []
-      if (workspace.length) groups.push({ kind: 'group', label: 'Workspace', skills: workspace })
-      if (settings.length) groups.push({ kind: 'group', label: 'Settings', skills: settings })
+      if (project.length) groups.push({ kind: 'group', label: 'Project', skills: project })
+      if (global.length) groups.push({ kind: 'group', label: 'Global', skills: global })
       return groups
     }
     if (node.kind === 'group') return node.skills.map(skill => ({ kind: 'skill', skill }))
@@ -58,28 +60,20 @@ export class SkillTreeProvider implements vscode.TreeDataProvider<Node>, vscode.
   }
 }
 
+/** Inserts `/<name>` at the active cursor position in the open `.prompt.md` file. */
 export async function insertSkillCommand(registry: SkillRegistry, name: string): Promise<void> {
   const editor = vscode.window.activeTextEditor
   if (!editor || !editor.document.fileName.endsWith('.prompt.md')) {
     vscode.window.showInformationMessage('Open a .prompt.md file to insert a skill.')
     return
   }
-  const skill = registry.get(name)
-  if (!skill) return
-
-  let snippet = `/${name}`
-  if (skill.readmePath) {
-    try {
-      const content = fs.readFileSync(skill.readmePath, 'utf8')
-      const tabStops = extractSnippetTabStops(content)
-      if (tabStops) snippet = `/${name}\n${tabStops}`
-    } catch {
-      // fall through with plain insert
-    }
-  }
-  await editor.insertSnippet(new vscode.SnippetString(snippet))
+  await editor.edit(editBuilder => {
+    editBuilder.insert(editor.selection.active, `/${name}`)
+  })
+  await vscode.commands.executeCommand('editor.action.hideSuggestWidget')
 }
 
+/** Opens the skill's README in the editor; used by the tree-node context menu. */
 export async function openSkillReadmeCommand(registry: SkillRegistry, name: string): Promise<void> {
   const skill = registry.get(name)
   if (!skill?.readmePath) {

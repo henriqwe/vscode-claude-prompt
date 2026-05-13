@@ -43,6 +43,8 @@ export interface ExpansionOptions {
   readFile?: (absPath: string) => string | null
 }
 
+/** Resolves and inlines all `@file`, `/skill`, `!include`, and `{{var}}` references. */
+
 const DEFAULT_MAX_DEPTH = 5
 
 const LANG_BY_EXT: Record<string, string> = {
@@ -97,6 +99,12 @@ export function parseFrontmatter(text: string): {
   return { vars, body: lines.slice(end + 1).join('\n'), consumedLines: end + 1 }
 }
 
+/**
+ * Expands `text` into a fully inlined prompt string.
+ * Expansion order: frontmatter variable substitution → !include → @file → /skill.
+ * The `sections` array in the result records every inlined chunk with its source
+ * range so callers (preview panel, token decorations) can map back to the editor.
+ */
 export async function expand(text: string, options: ExpansionOptions): Promise<ExpansionResult> {
   const read = options.readFile ?? defaultRead
   const maxDepth = options.maxDepth ?? DEFAULT_MAX_DEPTH
@@ -248,18 +256,23 @@ function expandRecursive(text: string, ctx: RecursiveCtx): string {
   return result
 }
 
+/**
+ * Returns the skill README body with frontmatter stripped so the `---` delimiters
+ * are not included in the expanded prompt sent to Claude.
+ */
 function readSkillBody(skill: Skill, read: (p: string) => string | null): string | null {
   if (!skill.readmePath) return null
   const raw = read(skill.readmePath)
   if (raw == null) return null
-  // Strip frontmatter if present
   const { body } = parseFrontmatter(raw)
   return body.trim()
 }
 
 /**
- * Run a replacement only on text segments outside fenced code blocks.
- * Callback receives (match, ...groups, lineIdx, colIdx).
+ * Runs `replacer` on every regex match that falls outside a fenced code block.
+ * The replacer receives `(match, ...captureGroups, lineIndex, colOffset)` where
+ * lineIndex and colOffset are the 0-based line/column of the match in `text`.
+ * A fresh RegExp is created per line so that `lastIndex` resets correctly.
  */
 function replaceOutsideFences(
   text: string,

@@ -15,6 +15,7 @@ import { PreviewPanel } from './previewPanel'
 import { RunHistory, RunHistoryTreeProvider } from './runHistory'
 import { RunPanel } from './runPanel'
 
+/** Matches all `*.prompt.md` files on disk — used for all language-feature registrations. */
 const PROMPT_SELECTOR: vscode.DocumentSelector = [
   { pattern: '**/*.prompt.md', scheme: 'file' },
 ]
@@ -22,6 +23,13 @@ const PROMPT_SELECTOR: vscode.DocumentSelector = [
 const MODELS = ['claude-opus-4-7', 'claude-sonnet-4-6', 'claude-haiku-4-5']
 const STATE_KEY = 'claude-prompt.lastRunOptions'
 
+/**
+ * Extension entry point. Instantiates all providers and registers all commands
+ * and language features. Everything is pushed into `context.subscriptions` so
+ * VS Code disposes them on deactivation.
+ * Already-open `.prompt.md` documents are linted immediately because
+ * `onDidOpenTextDocument` does not fire for files open before activation.
+ */
 export function activate(context: vscode.ExtensionContext): void {
   const registry = new SkillRegistry()
   const lintProvider = new LintProvider(registry)
@@ -98,6 +106,11 @@ export function deactivate(): void {
   cleanupTempFiles()
 }
 
+/**
+ * Walks the user through a model/thinking/flags QuickPick before running.
+ * Persists the last-used options in `workspaceState` so the inputs are pre-filled
+ * on the next invocation.
+ */
 async function runWithOptions(
   context: vscode.ExtensionContext,
   registry: SkillRegistry,

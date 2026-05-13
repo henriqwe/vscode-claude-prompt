@@ -23,7 +23,7 @@ This is a VS Code extension that activates on `*.prompt.md` files (language ID `
 
 ### Key modules
 
-- **`skillRegistry.ts`** — Reads skills from `.claude/skills/` subdirectories and `.claude/settings.json` in the workspace. Skills hot-reload via `FileSystemWatcher`. Exposes `extractDescription`, `extractTriggerConditions`, and `extractSnippetTabStops` as pure functions (used in tests and providers).
+- **`skillRegistry.ts`** — Reads skills from both project-local `.claude/skills/` and the global `~/.claude/skills/` directories, plus their respective `settings.json` files. Skills carry a `source: 'project' | 'global'` field; project skills take precedence on name collisions. Hot-reloads via `FileSystemWatcher` on all four sources. Exposes `extractDescription`, `extractTriggerConditions`, and `extractSnippetTabStops` as pure functions (used in tests and providers).
 
 - **`completionProvider.ts`** — Handles `/` trigger. Filters registry skills by prefix, builds `SnippetString` tab stops from the skill's README ARGUMENTS section via `extractSnippetTabStops`.
 
@@ -35,7 +35,13 @@ This is a VS Code extension that activates on `*.prompt.md` files (language ID `
 
 - **`codeLensProvider.ts`** — Emits two CodeLens items at line 0: **▶ Run in Claude** and **⚡ ~N tokens**.
 
-- **`hoverProvider.ts`** — Hover card for `/skill-name` tokens showing description, trigger conditions, and source path.
+- **`hoverProvider.ts`** — Hover card for `/skill-name` tokens showing description, trigger conditions, parsed ARGUMENTS, and source path. Results are cached per skill name and invalidated on registry change.
+
+- **`conversationPanel.ts`** — Webview panel that drives multi-turn conversations with the Claude CLI. Streams `--output-format stream-json` output, renders text/thinking/tool events in real time, and allows the user to send follow-up messages in the same Claude session (via `--resume <sessionId>`). Supports replay of past runs via `ConversationPanel.replay()`.
+
+- **`runHistory.ts`** — Persists up to 100 `RunRecord` entries (with per-turn `TurnRecord[]`) in VS Code `globalState`. Provides `RunHistoryTreeProvider` for the sidebar tree view, bucketing runs into Today / Yesterday / This week / Older.
+
+- **`skillTreeProvider.ts`** — Renders registered skills in a sidebar tree grouped into **Project** and **Global** buckets. Each skill node runs `claude-prompt.insertSkill` on click.
 
 ### Testing approach
 
