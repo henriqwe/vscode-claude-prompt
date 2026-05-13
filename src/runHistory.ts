@@ -1,5 +1,14 @@
 import * as vscode from 'vscode'
 
+export interface TurnRecord {
+  userMessage: string
+  output: string
+  tokensIn: number
+  tokensOut: number
+  durationMs: number
+  exitCode: number | null
+}
+
 export interface RunRecord {
   id: string
   filePath: string
@@ -11,6 +20,8 @@ export interface RunRecord {
   tokensIn: number
   tokensOut: number
   output: string
+  sessionId?: string | null
+  turns?: TurnRecord[]
 }
 
 const STATE_KEY = 'claude-prompt.runs'
@@ -34,6 +45,22 @@ export class RunHistory {
     const items = this.list()
     items.unshift(record)
     if (items.length > MAX) items.length = MAX
+    await this.context.globalState.update(STATE_KEY, items)
+    this._onDidChange.fire()
+  }
+
+  async upsert(record: RunRecord): Promise<void> {
+    if (record.output.length > MAX_OUTPUT) {
+      record = { ...record, output: record.output.slice(0, MAX_OUTPUT) + '\n…[truncated]' }
+    }
+    const items = this.list()
+    const idx = items.findIndex(r => r.id === record.id)
+    if (idx >= 0) {
+      items[idx] = record
+    } else {
+      items.unshift(record)
+      if (items.length > MAX) items.length = MAX
+    }
     await this.context.globalState.update(STATE_KEY, items)
     this._onDidChange.fire()
   }
