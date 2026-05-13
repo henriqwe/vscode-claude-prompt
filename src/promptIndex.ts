@@ -1,21 +1,16 @@
 import * as vscode from 'vscode'
 import * as fs from 'fs'
+import { parseFrontmatter } from './utils/frontmatter'
 
 /**
  * Extracts the first `# Heading` from markdown text, skipping YAML frontmatter
  * and fenced code blocks. Returns null when no H1 is found.
  */
 export function extractFirstHeading(text: string): string | null {
-  const lines = text.split('\n')
+  const { body } = parseFrontmatter(text)
+  const lines = body.split('\n')
   let inFence = false
-  let inFrontmatter = false
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
-    if (i === 0 && line.trim() === '---') { inFrontmatter = true; continue }
-    if (inFrontmatter) {
-      if (line.trim() === '---') inFrontmatter = false
-      continue
-    }
+  for (const line of lines) {
     if (/^```/.test(line.trim())) { inFence = !inFence; continue }
     if (inFence) continue
     const m = /^#\s+(.+)$/.exec(line)

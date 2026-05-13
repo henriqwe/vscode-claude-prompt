@@ -2,6 +2,7 @@ import * as vscode from 'vscode'
 import * as path from 'path'
 import * as fs from 'fs'
 import * as os from 'os'
+import { parseFrontmatter } from './utils/frontmatter'
 
 export interface Skill {
   name: string
@@ -48,79 +49,62 @@ export class SkillRegistry implements vscode.Disposable {
     return this.skills.has(name)
   }
 
-  /** Clears and reloads all four skill sources; fires `onDidChange` when done. */
+  /** Clears and reloads all skill sources; fires `onDidChange` when done. */
   refresh(): void {
     this.skills.clear()
-    this.loadFromSkillDirs()
-    this.loadFromSettings()
-    this.loadFromGlobalSkillDirs()
-    this.loadFromGlobalSettings()
+    for (const folder of vscode.workspace.workspaceFolders ?? []) {
+      const claudeDir = path.join(folder.uri.fsPath, '.claude')
+      this.loadSkillSource(path.join(claudeDir, 'skills'), path.join(claudeDir, 'settings.json'), 'project')
+    }
+    this.loadSkillSource(
+      path.join(this.globalClaudeDir, 'skills'),
+      path.join(this.globalClaudeDir, 'settings.json'),
+      'global',
+    )
     this._onDidChange.fire()
   }
 
   private setupWatchers(): void {
-    const skillsWatcher = vscode.workspace.createFileSystemWatcher('**/.claude/skills/**')
-    skillsWatcher.onDidCreate(() => this.refresh())
-    skillsWatcher.onDidDelete(() => this.refresh())
-    skillsWatcher.onDidChange(() => this.refresh())
-
-    const settingsWatcher = vscode.workspace.createFileSystemWatcher('**/.claude/settings.json')
-    settingsWatcher.onDidCreate(() => this.refresh())
-    settingsWatcher.onDidDelete(() => this.refresh())
-    settingsWatcher.onDidChange(() => this.refresh())
-
-    const globalSkillsUri = vscode.Uri.file(this.globalClaudeDir)
-    const globalSkillsWatcher = vscode.workspace.createFileSystemWatcher(
-      new vscode.RelativePattern(globalSkillsUri, 'skills/**'),
-    )
-    globalSkillsWatcher.onDidCreate(() => this.refresh())
-    globalSkillsWatcher.onDidDelete(() => this.refresh())
-    globalSkillsWatcher.onDidChange(() => this.refresh())
-
-    const globalSettingsWatcher = vscode.workspace.createFileSystemWatcher(
-      new vscode.RelativePattern(globalSkillsUri, 'settings.json'),
-    )
-    globalSettingsWatcher.onDidCreate(() => this.refresh())
-    globalSettingsWatcher.onDidDelete(() => this.refresh())
-    globalSettingsWatcher.onDidChange(() => this.refresh())
-
-    this.watchers.push(skillsWatcher, settingsWatcher, globalSkillsWatcher, globalSettingsWatcher)
+    this.watchSource('**/.claude/skills/**')
+    this.watchSource('**/.claude/settings.json')
+    const globalUri = vscode.Uri.file(this.globalClaudeDir)
+    this.watchSource(new vscode.RelativePattern(globalUri, 'skills/**'))
+    this.watchSource(new vscode.RelativePattern(globalUri, 'settings.json'))
   }
 
-  private loadFromSkillDirs(): void {
-    const workspaceFolders = vscode.workspace.workspaceFolders ?? []
-    for (const folder of workspaceFolders) {
-      const skillsRoot = path.join(folder.uri.fsPath, '.claude', 'skills')
-      if (!fs.existsSync(skillsRoot)) continue
+  private watchSource(pattern: string | vscode.RelativePattern): void {
+    const w = vscode.workspace.createFileSystemWatcher(pattern)
+    w.onDidCreate(() => this.refresh())
+    w.onDidDelete(() => this.refresh())
+    w.onDidChange(() => this.refresh())
+    this.watchers.push(w)
+  }
 
-      const entries = fs.readdirSync(skillsRoot, { withFileTypes: true })
+  private loadSkillSource(skillsDir: string, settingsPath: string, source: Skill['source']): void {
+    if (fs.existsSync(skillsDir)) {
+      let entries: fs.Dirent[]
+      try { entries = fs.readdirSync(skillsDir, { withFileTypes: true }) } catch { entries = [] }
       for (const entry of entries) {
         if (!entry.isDirectory()) continue
-        const skillDir = path.join(skillsRoot, entry.name)
-        const skill = this.parseSkillDir(entry.name, skillDir, 'project')
-        if (!this.skills.has(skill.name)) {
-          this.skills.set(skill.name, skill)
-        }
+        const skill = this.parseSkillDir(entry.name, path.join(skillsDir, entry.name), source)
+        if (!this.skills.has(skill.name)) this.skills.set(skill.name, skill)
       }
     }
-  }
 
-  private loadFromGlobalSkillDirs(): void {
-    const skillsRoot = path.join(this.globalClaudeDir, 'skills')
-    if (!fs.existsSync(skillsRoot)) return
-
-    let entries: fs.Dirent[]
-    try {
-      entries = fs.readdirSync(skillsRoot, { withFileTypes: true })
-    } catch {
-      return
-    }
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue
-      const skillDir = path.join(skillsRoot, entry.name)
-      const skill = this.parseSkillDir(entry.name, skillDir, 'global')
-      if (!this.skills.has(skill.name)) {
-        this.skills.set(skill.name, skill)
+    if (fs.existsSync(settingsPath)) {
+      try {
+        const json = JSON.parse(fs.readFileSync(settingsPath, 'utf8'))
+        const names: unknown[] = json?.skills ?? []
+        for (const entry of names) {
+          if (typeof entry === 'string' && !this.skills.has(entry)) {
+            this.skills.set(entry, {
+              name: entry, description: '', triggerConditions: '',
+              sourcePath: settingsPath, readmePath: null, source,
+            })
+          }
+        }
+      } catch {
+        // malformed JSON — skip
       }
     }
   }
@@ -155,83 +139,10 @@ export class SkillRegistry implements vscode.Disposable {
     return null
   }
 
-  private loadFromSettings(): void {
-    const workspaceFolders = vscode.workspace.workspaceFolders ?? []
-    for (const folder of workspaceFolders) {
-      const settingsPath = path.join(folder.uri.fsPath, '.claude', 'settings.json')
-      if (!fs.existsSync(settingsPath)) continue
-
-      try {
-        const raw = fs.readFileSync(settingsPath, 'utf8')
-        const json = JSON.parse(raw)
-        const skills: unknown[] = json?.skills ?? []
-        for (const entry of skills) {
-          if (typeof entry === 'string' && !this.skills.has(entry)) {
-            this.skills.set(entry, {
-              name: entry,
-              description: '',
-              triggerConditions: '',
-              sourcePath: settingsPath,
-              readmePath: null,
-              source: 'project',
-            })
-          }
-        }
-      } catch {
-        // malformed JSON — skip
-      }
-    }
-  }
-
-  private loadFromGlobalSettings(): void {
-    const settingsPath = path.join(this.globalClaudeDir, 'settings.json')
-    if (!fs.existsSync(settingsPath)) return
-
-    try {
-      const raw = fs.readFileSync(settingsPath, 'utf8')
-      const json = JSON.parse(raw)
-      const skills: unknown[] = json?.skills ?? []
-      for (const entry of skills) {
-        if (typeof entry === 'string' && !this.skills.has(entry)) {
-          this.skills.set(entry, {
-            name: entry,
-            description: '',
-            triggerConditions: '',
-            sourcePath: settingsPath,
-            readmePath: null,
-            source: 'global',
-          })
-        }
-      }
-    } catch {
-      // malformed JSON — skip
-    }
-  }
-
   dispose(): void {
     this.watchers.forEach(w => w.dispose())
     this._onDidChange.dispose()
   }
-}
-
-function parseFrontmatter(content: string): { body: string; fields: Record<string, string> } {
-  const fields: Record<string, string> = {}
-  if (!content.startsWith('---')) return { body: content, fields }
-
-  const closeIdx = content.indexOf('\n---', 3)
-  if (closeIdx === -1) return { body: content, fields }
-
-  const frontmatter = content.slice(3, closeIdx)
-  const body = content.slice(closeIdx + 4).trimStart()
-
-  for (const line of frontmatter.split('\n')) {
-    const m = line.match(/^(\w+):\s*(.+?)\s*$/)
-    if (!m) continue
-    const val = m[2].replace(/^["']|["']$/g, '')
-    fields[m[1]] = val
-  }
-
-  return { body, fields }
 }
 
 /**

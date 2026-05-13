@@ -1,8 +1,7 @@
 import * as vscode from 'vscode'
 import { expand, ExpandedSection } from './promptExpander'
 import { SkillRegistry } from './skillRegistry'
-
-const DEBOUNCE_MS = 300
+import { DEBOUNCE_MS, TOKEN_THRESHOLD_YELLOW, TOKEN_THRESHOLD_RED } from './utils/constants'
 
 /**
  * Applies whole-line background colours to every expanded section in a `.prompt.md` file:
@@ -107,7 +106,7 @@ export class TokenDecorations implements vscode.Disposable {
 
     const buckets = { green: [] as vscode.DecorationOptions[], yellow: [] as vscode.DecorationOptions[], red: [] as vscode.DecorationOptions[] }
     for (const section of result.sections) {
-      const bucket = section.tokens < 500 ? buckets.green : section.tokens < 2000 ? buckets.yellow : buckets.red
+      const bucket = section.tokens < TOKEN_THRESHOLD_YELLOW ? buckets.green : section.tokens < TOKEN_THRESHOLD_RED ? buckets.yellow : buckets.red
       bucket.push({
         range: toVsRange(section),
         hoverMessage: `${section.kind} · ${section.tokens} tokens · ${section.source}`,

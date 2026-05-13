@@ -2,6 +2,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { countTokens } from './tokenizer'
 import type { SkillRegistry, Skill } from './skillRegistry'
+import { parseFrontmatter as _parseFrontmatter } from './utils/frontmatter'
 
 export type SectionKind = 'text' | 'file' | 'skill' | 'include'
 
@@ -64,39 +65,14 @@ function defaultRead(absPath: string): string | null {
   }
 }
 
-/**
- * Parses YAML frontmatter (only scalar string/number/boolean) at the top of the document.
- * Returns the parsed vars and the text with frontmatter stripped.
- */
+/** Parses YAML frontmatter at the top of the document, returning `vars` (field map), `body`, and `consumedLines`. */
 export function parseFrontmatter(text: string): {
   vars: Record<string, string>
   body: string
   consumedLines: number
 } {
-  const lines = text.split('\n')
-  if (lines[0]?.trim() !== '---') return { vars: {}, body: text, consumedLines: 0 }
-
-  let end = -1
-  for (let i = 1; i < lines.length; i++) {
-    if (lines[i].trim() === '---') { end = i; break }
-  }
-  if (end === -1) return { vars: {}, body: text, consumedLines: 0 }
-
-  const vars: Record<string, string> = {}
-  for (let i = 1; i < end; i++) {
-    const line = lines[i]
-    const m = /^([A-Za-z_][A-Za-z0-9_-]*)\s*:\s*(.*)$/.exec(line)
-    if (!m) continue
-    const key = m[1]
-    let value = m[2].trim()
-    // strip surrounding quotes
-    if ((value.startsWith('"') && value.endsWith('"')) ||
-        (value.startsWith("'") && value.endsWith("'"))) {
-      value = value.slice(1, -1)
-    }
-    vars[key] = value
-  }
-  return { vars, body: lines.slice(end + 1).join('\n'), consumedLines: end + 1 }
+  const { body, fields: vars, consumedLines } = _parseFrontmatter(text)
+  return { vars, body, consumedLines }
 }
 
 /**

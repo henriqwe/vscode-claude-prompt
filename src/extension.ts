@@ -12,7 +12,8 @@ import { newFromTemplateCommand } from './templateCommand'
 import { SkillTreeProvider, insertSkillCommand, openSkillReadmeCommand } from './skillTreeProvider'
 import { TokenDecorations } from './tokenDecorations'
 import { PreviewPanel } from './previewPanel'
-import { RunHistory, RunHistoryTreeProvider } from './runHistory'
+import { RunHistory } from './runHistory'
+import { RunHistoryTreeProvider } from './runHistoryTreeProvider'
 import { RunPanel } from './runPanel'
 
 /** Matches all `*.prompt.md` files on disk — used for all language-feature registrations. */

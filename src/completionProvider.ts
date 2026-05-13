@@ -1,6 +1,5 @@
 import * as vscode from 'vscode'
-import * as fs from 'fs'
-import { SkillRegistry, extractSnippetTabStops } from './skillRegistry'
+import { SkillRegistry } from './skillRegistry'
 
 /**
  * Provides `/skill-name` completions when the user types `/` at the start of a
@@ -49,13 +48,3 @@ export class CompletionProvider implements vscode.CompletionItemProvider {
   }
 }
 
-/** Reads the skill README and builds a tab-stop snippet string, or null if no ARGUMENTS section exists. */
-function buildSnippet(skill: { readmePath: string | null }): string | null {
-  if (!skill.readmePath) return null
-  try {
-    const content = fs.readFileSync(skill.readmePath, 'utf8')
-    return extractSnippetTabStops(content)
-  } catch {
-    return null
-  }
-}

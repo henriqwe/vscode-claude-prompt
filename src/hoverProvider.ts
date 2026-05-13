@@ -1,6 +1,7 @@
 import * as vscode from 'vscode'
 import * as fs from 'fs'
 import { SkillRegistry } from './skillRegistry'
+import { parseFrontmatter } from './utils/frontmatter'
 
 const SKILL_TOKEN = /\/([a-z][a-z0-9-]*)/g
 
@@ -76,13 +77,9 @@ export class HoverProvider implements vscode.HoverProvider {
 function readFirstParagraph(readmePath: string | null): string {
   if (!readmePath) return ''
   try {
-    let content = fs.readFileSync(readmePath, 'utf8')
-    // strip YAML frontmatter
-    if (content.startsWith('---')) {
-      const close = content.indexOf('\n---', 3)
-      if (close !== -1) content = content.slice(close + 4).trimStart()
-    }
-    const lines = content.split('\n')
+    const raw = fs.readFileSync(readmePath, 'utf8')
+    const { body } = parseFrontmatter(raw)
+    const lines = body.split('\n')
     const para: string[] = []
     let started = false
     for (const line of lines) {

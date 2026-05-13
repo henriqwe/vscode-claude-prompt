@@ -2,8 +2,8 @@ import * as vscode from 'vscode'
 import { expand, ExpansionResult } from './promptExpander'
 import { SkillRegistry } from './skillRegistry'
 import { countTokens } from './tokenizer'
-
-const DEBOUNCE_MS = 300
+import { escapeHtml } from './utils/html'
+import { DEBOUNCE_MS } from './utils/constants'
 
 /**
  * Singleton webview panel that renders the fully-expanded prompt in real time.
@@ -97,11 +97,6 @@ export class PreviewPanel implements vscode.Disposable {
   }
 }
 
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, c => (
-    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!
-  ))
-}
 
 function renderHtml(state: { result?: ExpansionResult; total?: number; error?: string }): string {
   if (state.error) {
